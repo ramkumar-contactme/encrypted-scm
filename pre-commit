@@ -1,0 +1,32 @@
+#cat .git/hooks/pre-commit
+
+
+#!/bin/sh
+# Loop over all staged files (Added, Copied, or Modified)
+for file in $(git diff --cached --name-only --diff-filter=ACM); do
+  # Skip files already ending in .gpg
+  if echo "$file" | grep -qv "\.gpg$"; then
+    echo "Encrypting $file..."
+    
+    # Encrypt the file and output to a temporary file
+    gpg --batch --yes --output "$file.gpg" --encrypt --recipient "mail" "$file"
+    
+    # If encryption fails, exit the hook to prevent an unencrypted commit.
+    if [ $? -ne 0 ]; then
+      echo "Encryption failed for $file"
+      exit 1
+    fi
+
+    # Remove the raw file from the staging area
+    git rm --cached "$file"
+    
+    # Delete the raw file from the working directory
+    rm "$file"
+    
+    # Rename the encrypted file back to the original filename
+    mv "$file.gpg" "$file"
+    
+    # Add the encrypted file to the staging area
+    git add "$file"
+  fi
+done
